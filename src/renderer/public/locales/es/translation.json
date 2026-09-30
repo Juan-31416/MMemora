@@ -1,6 +1,6 @@
 {
   "welcome": {
-    "title": "Bienvenido a MindMapper"
+    "title": "Bienvenido a MMemora"
   },
 
   "common": {
@@ -80,7 +80,7 @@
   },
 
   "canvas": {
-    "loading": "Cargando MindMapper...",
+    "loading": "Cargando MMemora...",
     "defaultNodeText": "Nueva idea",
     "newNode": "Nuevo nodo",
     "mainIdea": "Idea principal"
@@ -186,7 +186,7 @@
     "help": "Ayuda",
     "documentation": "Documentación",
     "shortcuts": "Atajos de teclado",
-    "about": "Acerca de MindMapper",
+    "about": "Acerca de MMemora",
     "aboutDetail": "Una herramienta de mapas mentales local y privada."
   },
 

@@ -1,6 +1,6 @@
 {
   "welcome": {
-    "title": "Welcome to MindMapper"
+    "title": "Welcome to MMemora"
   },
 
   "common": {
@@ -80,7 +80,7 @@
   },
 
   "canvas": {
-    "loading": "Loading MindMapper...",
+    "loading": "Loading MMemora...",
     "defaultNodeText": "New idea",
     "newNode": "New node",
     "mainIdea": "Main Idea"
@@ -186,7 +186,7 @@
     "help": "Help",
     "documentation": "Documentation",
     "shortcuts": "Keyboard Shortcuts",
-    "about": "About MindMapper",
+    "about": "About MMemora",
     "aboutDetail": "A local, private mind mapping tool."
   },
 
