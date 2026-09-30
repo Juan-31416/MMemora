@@ -3,9 +3,19 @@ import * as LucideIcons from 'lucide-react';
 import { useMindMapStore } from '../store/mindMapStore';
 import { toggleTheme, getCurrentTheme } from '../utils/theme';
 import { getAvailableTemplates } from '../templates/brainstorming';
+import { useTranslation } from 'react-i18next';
 import '../styles/Toolbar.css';
 
-const Toolbar: React.FC = () => {
+
+
+interface ToolbarProps {
+  onOpenSettings: () => void;
+}
+
+
+
+const Toolbar: React.FC<ToolbarProps> = ({ onOpenSettings }) => {
+  const { t } = useTranslation();
   const {
     currentMap,
     isDirty,
@@ -24,6 +34,9 @@ const Toolbar: React.FC = () => {
   const layout = useMindMapStore((state) => state.layout);
   const setLayout = useMindMapStore((state) => state.setLayout);
   
+  const edgeStyle    = useMindMapStore((state) => state.edgeStyle);
+  const setEdgeStyle = useMindMapStore((state) => state.setEdgeStyle);
+
   const [theme, setTheme] = useState(getCurrentTheme());
   const [showTemplates, setShowTemplates] = useState(false);
 
@@ -37,9 +50,9 @@ const Toolbar: React.FC = () => {
     if (isDirty) {
       const result = await window.electronAPI.dialog.showMessage({
         type: 'question',
-        title: 'Unsaved Changes',
-        message: 'You have unsaved changes. Do you want to continue?',
-        buttons: ['Cancel', 'Continue'],
+        title: t('dialogs.unsavedChanges.title'),
+        message: t('dialogs.unsavedChanges.message'),
+        buttons: [t('dialogs.unsavedChanges.cancel'), t('dialogs.unsavedChanges.continue')],
         defaultId: 0,
         cancelId: 0,
       });
@@ -71,15 +84,20 @@ const Toolbar: React.FC = () => {
     setLayout(layoutType);
   };
 
+  const handleEdgeStyleToggle = () => {
+    setEdgeStyle(edgeStyle === 'curved' ? 'straight' : 'curved');
+  };
+
   return (
     <div className="toolbar">
       <div className="toolbar-left">
+
         {/* File Operations */}
         <div className="toolbar-section" style={{ position: 'relative' }}>
           <button
             className="toolbar-btn primary"
             onClick={() => setShowTemplates(!showTemplates)}
-            title="New from Template"
+            title={t('toolbar.tooltips.new')}
           >
             <LucideIcons.FilePlus size={20} />
             <span>New</span>
@@ -91,11 +109,7 @@ const Toolbar: React.FC = () => {
                   key={template.id}
                   className="toolbar-dropdown-item"
                   onClick={() => handleTemplateSelect(template.id)}
-                  style={{
-                    width: '100%',
-                    justifyContent: 'flex-start',
-                    borderRadius: 0,
-                  }}
+                  style={{ width: '100%', justifyContent: 'flex-start', borderRadius: 0 }}
                   title={template.description}
                 >
                   <span>{template.name}</span>
@@ -103,18 +117,10 @@ const Toolbar: React.FC = () => {
               ))}
             </div>
           )}
-          <button
-            className="toolbar-btn"
-            onClick={openMap}
-            title="Open (Ctrl+O)"
-          >
+          <button className="toolbar-btn" onClick={openMap} title={t('toolbar.tooltips.open')}>
             <LucideIcons.FolderOpen size={20} />
           </button>
-          <button
-            className="toolbar-btn"
-            onClick={saveMap}
-            title="Save (Ctrl+S)"
-          >
+          <button className="toolbar-btn" onClick={saveMap} title={t('toolbar.tooltips.save')}>
             <LucideIcons.Save size={20} />
           </button>
         </div>
@@ -123,33 +129,23 @@ const Toolbar: React.FC = () => {
 
         {/* Undo/Redo */}
         <div className="toolbar-section">
-          <button
-            className="toolbar-btn"
-            onClick={undo}
-            disabled={!canUndo()}
-            title="Undo (Ctrl+Z)"
-          >
+          <button className="toolbar-btn" onClick={undo} disabled={!canUndo()} title={t('toolbar.tooltips.undo')}>
             <LucideIcons.Undo size={20} />
           </button>
-          <button
-            className="toolbar-btn"
-            onClick={redo}
-            disabled={!canRedo()}
-            title="Redo (Ctrl+Y)"
-          >
+          <button className="toolbar-btn" onClick={redo} disabled={!canRedo()} title={t('toolbar.tooltips.redo')}>
             <LucideIcons.Redo size={20} />
           </button>
         </div>
 
         <div className="toolbar-divider"></div>
 
-        {/** Layout Toogle - Integrated */}
+        {/* Layout Toggle */}
         <div className="toolbar-section layout-toogle">
           <button
             className={`toolbar-btn layout-btn ${layout === 'hierarchical' ? 'active' : ''}`}
             onClick={() => handleLayoutChange('hierarchical')}
-            title="Vista Jerárquica"
-            aria-label="Vista Jerárquica"
+            title={t('toolbar.tooltips.hierarchical')}
+            aria-label={t('toolbar.tooltips.hierarchical')}
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <rect x="7" y="2" width="6" height="3" rx="1" stroke="currentColor" strokeWidth="1.5"/>
@@ -157,14 +153,14 @@ const Toolbar: React.FC = () => {
               <rect x="12" y="9" width="6" height="3" rx="1" stroke="currentColor" strokeWidth="1.5"/>
               <path d="M10 5V9M5 9V7.5M15 9V7.5M10 7.5H5M10 7.5H15" stroke="currentColor" strokeWidth="1.5"/>
             </svg>
-            <span>Jerárquica</span>
+            <span>{t('toolbar.hierarchical')}</span>
           </button>
 
           <button
             className={`toolbar-btn layout-btn ${layout === 'radial' ? 'active' : ''}`}
             onClick={() => handleLayoutChange('radial')}
-            title="Vista Radial"
-            aria-label="Vista Radial"
+            title={t('toolbar.tooltips.radial')}
+            aria-label={t('toolbar.tooltips.radial')}
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <circle cx="10" cy="10" r="2" stroke="currentColor" strokeWidth="1.5"/>
@@ -174,54 +170,102 @@ const Toolbar: React.FC = () => {
               <circle cx="3" cy="10" r="1.5" stroke="currentColor" strokeWidth="1.5"/>
               <path d="M10 5V8M12 10H15.5M10 12V15.5M8 10H4.5" stroke="currentColor" strokeWidth="1.5"/>
             </svg>
-            <span>Radial</span>
+            <span>{t('toolbar.radial')}</span>
           </button>
         </div>
 
         <div className="toolbar-divider"></div>
 
-        {/** Zoom Controls */}
+        {/** Edge Style Toggle */}
         <div className="toolbar-section">
           <button
-            className="toolbar-btn"
-            onClick={handleZoomOut}
-            title="Zoom Out"
+            className={`toolbar-btn ${edgeStyle === 'curved' ? 'active' : ''}`}
+            onClick={handleEdgeStyleToggle}
+            title={edgeStyle === 'curved' ? t('toolbar.tooltips.curved') : t('toolbar.tooltips.straight')}
+            aria-label={edgeStyle === 'curved' ? t('toolbar.tooltips.curved') : t('toolbar.tooltips.straight')}
           >
+            {edgeStyle === 'curved' ? (
+              // Icono curva
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path
+                  d="M3 16 C3 16, 8 4, 17 4"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  fill="none"
+                />
+                <path
+                  d="M3 4 C3 4, 8 16, 17 16"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  fill="none"
+                  opacity="0.35"
+                />
+              </svg>
+            ) : (
+              // Icono recta
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <line
+                  x1="3" y1="16" x2="17" y2="4"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+                <line
+                  x1="3" y1="4" x2="17" y2="16"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  opacity="0.35"
+                />
+              </svg>
+            )}
+            <span>{edgeStyle === 'curved' ? t('toolbar.curved') : t('toolbar.straight')}</span>
+          </button>
+        </div>
+
+        <div className="toolbar-divider"></div>
+
+        {/* Zoom Controls */}
+        <div className="toolbar-section">
+          <button className="toolbar-btn" onClick={handleZoomOut} title={t('toolbar.tooltips.zoomOut')}>
             <LucideIcons.ZoomOut size={20} />
           </button>
           <span className="zoom-level">{Math.round(viewport.zoom * 100)}%</span>
-          <button
-            className="toolbar-btn"
-            onClick={handleZoomIn}
-            title="Zoom In"
-          >
+          <button className="toolbar-btn" onClick={handleZoomIn} title={t('toolbar.tooltips.zoomIn')}>
             <LucideIcons.ZoomIn size={20} />
           </button>
         </div>
-      </div>
+      </div> 
 
-      {/** Center - Map Name */}
+      {/* Center - Map Name */}
       <div className="toolbar-center">
         {currentMap && (
           <div className="map-name">
             <LucideIcons.Brain size={20} />
-            <span>{currentMap.name}</span>
-            {isDirty && (
-              <div className="dirty-indicator" title="Unsaved changes"></div>
-            )}
+            <span className="map-name-label">{t('toolbar.name')}</span>
+            {isDirty && <div className="dirty-indicator" title={t('dialogs.unsavedChanges.title')}></div>}
           </div>
         )}
       </div>
 
-      {/** Right - Theme Toogle */}
+      {/* Right - Theme Toggle */}
       <div className="toolbar-right">
         <div className="toolbar-section">
           <button
             className="toolbar-btn theme-toggle-btn"
             onClick={handleToggleTheme}
-            title="Toggle Theme (Ctrl+T)"
+            title={t('toolbar.tooltips.toggleTheme')}
           >
             {theme === 'dark' ? <LucideIcons.Sun size={20} /> : <LucideIcons.Moon size={20} />}
+          </button>
+          <button
+            className="toolbar-btn"
+            onClick={onOpenSettings}
+            title={t('toolbar.tooltips.settings')}
+          >
+            <LucideIcons.Settings size={20} />
           </button>
         </div>
       </div>

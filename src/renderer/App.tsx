@@ -1,15 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import Toolbar from './components/Toolbar';
-import Canvas from './components/Canvas';
+import Canvas from './components/canvas/index';
 import NodeEditor from './components/NodeEditor';
 import SearchBar from './components/SearchBar';
 import { useMindMapStore } from './store/mindMapStore';
 import { initializeTheme, toggleTheme as utilToggleTheme } from './utils/theme';
 import { createBlankTemplate } from './templates/brainstorming';
+import SettingsModal from './components/SettingsModal';
+import { useTranslation } from 'react-i18next';
 import './styles/App.css';
-import { isSea } from 'node:sea';
+
+
+
 
 const App: React.FC = () => {
+  const { t } = useTranslation();
   const {
     currentMap,
     selectedNodeId,
@@ -29,6 +34,7 @@ const App: React.FC = () => {
   
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Initialize theme
   useEffect(() => {
@@ -49,9 +55,9 @@ const App: React.FC = () => {
       if (window.electronAPI?.dialog) {
         const result = await window.electronAPI.dialog.showMessage({
           type: 'question',
-          title: 'Unsaved Changes',
-          message: 'You have unsaved changes. Do you want to continue?',
-          buttons: ['Cancel', 'Continue'],
+          title: t('dialogs.unsavedChanges.title'),
+          message: t('dialogs.unsavedChanges.message'),
+          buttons: [t('dialogs.unsavedChanges.cancel'), t('dialogs.unsavedChanges.continue')],
           defaultId: 0,
           cancelId: 0,
         });
@@ -60,7 +66,7 @@ const App: React.FC = () => {
           return;
         }
       } else {
-        const confirmed = window.confirm('You have unsaved changes. Do  ou want to continue?');
+        const confirmed = window.confirm(t('dialogs.unsavedChanges.message'));
         if (!confirmed) return;
       }
     }
@@ -74,9 +80,13 @@ const App: React.FC = () => {
     if (isDirty && window.electronAPI?.dialog) {
       const result = await window.electronAPI.dialog.showMessage({
         type: 'question',
-        title: 'Unsaved Changes',
-        message: 'You have unsaved changes. Do you want to save before closing?',
-        buttons: ['Cancel', 'Close Without Saving', 'Save and Close'],
+        title: t('dialogs.closeWindow.title'),
+        message: t('dialogs.closeWindow.message'),
+        buttons: [
+          t('dialogs.closeWindow.cancel'),
+          t('dialogs.closeWindow.closeWithoutSaving'),
+          t('dialogs.closeWindow.saveAndClose'),
+        ],
         defaultId: 2,
         cancelId: 0,
       });
@@ -129,14 +139,14 @@ const App: React.FC = () => {
   // Initialize with demo map
   useEffect(() => {
     if (!currentMap) {
-      createNewMap('Welcome to MindMapper');
+      createNewMap(t('welcome.title'));
       
       // Add some initial nodes after a short delay
       setTimeout(() => {
         const { currentMap, selectedNodeId } = useMindMapStore.getState();
         if (currentMap && selectedNodeId) {
           // Create first child
-          createNode(selectedNodeId, 'Getting Started', false);
+          createNode(selectedNodeId, t('demo.gettingStarted'), false);
           
           setTimeout(() => {
             const { currentMap } = useMindMapStore.getState();
@@ -146,12 +156,12 @@ const App: React.FC = () => {
                 const firstChildId = rootNode.children[0];
                 
                 // Create grandchildren
-                createNode(firstChildId, 'Create nodes with Tab', false);
+                createNode(firstChildId, t('demo.createNodesWithTab'), false);
                 setTimeout(() => {
-                  createNode(firstChildId, 'Edit text with double-click', false);
+                  createNode(firstChildId, t('demo.editTextWithDoubleClick'), false);
                 }, 100);
                 setTimeout(() => {
-                  createNode(firstChildId, 'Drag to reorganize', false);
+                  createNode(firstChildId, t('demo.dragToReorganize'), false);
                 }, 200);
               }
             }
@@ -159,12 +169,12 @@ const App: React.FC = () => {
           
           // Create second child
           setTimeout(() => {
-            createNode(selectedNodeId, 'Features', false);
+            createNode(selectedNodeId, t('demo.features'), false);
           }, 300);
           
           // Create third child
           setTimeout(() => {
-            createNode(selectedNodeId, 'Customize Styles', false);
+            createNode(selectedNodeId, t('demo.customizeStyles'), false);
           }, 400);
         }
       }, 100);
@@ -221,12 +231,12 @@ const App: React.FC = () => {
       if (e.key === 'Tab') {
         e.preventDefault();
         if (selectedNodeId) {
-          createNode(selectedNodeId, 'New Node', false);
+          createNode(selectedNodeId, t('canvas.newNode'), false);
         }
       } else if (e.key === 'Enter') {
         e.preventDefault();
         if (selectedNodeId) {
-          createNode(selectedNodeId, 'New Node', true);
+          createNode(selectedNodeId, t('canvas.newNode'), true);
         }
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedNodeId && currentMap && selectedNodeId !== currentMap.rootNodeId) {
@@ -244,7 +254,7 @@ const App: React.FC = () => {
     return (
       <div className="app loading">
         <div className="loading-message">
-          <h2>Loading MindMapper...</h2>
+          <h2>{t('canvas.loading')}</h2>
         </div>
       </div>
     );
@@ -252,7 +262,7 @@ const App: React.FC = () => {
 
   return (
     <div className="app">
-      <Toolbar />
+      <Toolbar onOpenSettings={() => setIsSettingsOpen(true)} />
       
       <div className="app-content">
         <div className="canvas-area">
@@ -267,6 +277,11 @@ const App: React.FC = () => {
       <SearchBar
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
+      />
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
       />
     </div>
   );

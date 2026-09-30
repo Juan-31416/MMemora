@@ -1,5 +1,14 @@
 import { create } from 'zustand';
-import { MindMap, MindMapNode, NodeStyle, ViewportState, LayoutType, DEFAULT_NODE_STYLE } from '../types/mindmap';
+import { 
+  MindMap, 
+  MindMapNode, 
+  NodeStyle, 
+  ViewportState, 
+  LayoutType, 
+  DEFAULT_NODE_STYLE,
+  FavoriteColor,
+  MAX_FAVORITE_COLORS,
+} from '../types/mindmap';
 import { serializeToJSON, preparePDFExport, getExportBaseName } from '../utils/exporters';
 import { importFromContent } from '../utils/importers';
 import { buildTreeFromNodes, calculateLayout, createLayout, NODE_WIDTH, NODE_HEIGHT } from '../utils/layout';
@@ -7,6 +16,11 @@ import type { SearchState } from '../types/search';
 import { createSearchIndex, runSearch as runFuzzySearch, DEFAULT_SEARCH_CONFIG } from '../utils/searcher';
 import type Fuse from 'fuse.js';
 import type { MindMapNode as SearchableNode } from '../types/mindmap';
+import { normalizeHex } from '../utils/colorUtils';
+import { SettingsService, EdgeStyle } from '../services/settingsService';
+import i18n, { resolveLocale, applyDirection, SupportedLocale } from '../i18n/i18n';
+
+
 
 interface MindMapStore {
   currentMap: MindMap | null;
@@ -21,6 +35,10 @@ interface MindMapStore {
   isDirty: boolean;
   search: SearchState;
   _searchIndex?: Fuse<SearchableNode> | null;
+  favoriteColors: FavoriteColor[];
+  edgeStyle: EdgeStyle;
+  language: SupportedLocale;
+
 
   // Actions
   createNewMap: (name: string) => void;
@@ -53,41 +71,26 @@ interface MindMapStore {
   setSearchQuery: (query: string) => void;
   clearSearch: () => void;
   runSearchNow: () => void;
+  toggleCaseSensitive: () => void;
+  setActiveResultIndex: (index: number) => void;
+  addFavoriteColor: (color:string, userId?: string) => void;
+  removeFavoriteColor: (color: string, userId?: string) => void;
+  setEdgeStyle: (style: EdgeStyle) => void;
+  updateAllNodesStyle: (style: Partial<NodeStyle>) => void;
+  setLanguage: (lang: SupportedLocale) => void;
 }
+
+
 
 /***********************************
  *           UTILITIES
  *********************************** */
 
-const STORAGE_KEY = 'mindmapper-preferences';
-
-const loadPreferences = () => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : {};
-  } catch (error) {
-    console.error('Error loading preferences: ', error);
-    return {};
-  }
-};
-
-const savePreferences = (preferences: { layout?: LayoutType; theme?: 'light' | 'dark'}) => {
-  try {
-    const current = loadPreferences();
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ ...current, ...preferences })
-    );
-  } catch (error) {
-    console.error('Error saving preferences: ', error);
-  }
-};
-
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 const createRootNode = (): MindMapNode => ({
   id: generateId(),
-  text: 'Main Idea',
+  text: i18n.t('canvas.mainIdea'),
   parentId: null,
   children: [],
   style: { ...DEFAULT_NODE_STYLE },
@@ -114,12 +117,14 @@ const safeNumber = (value: number | undefined, fallback: number): number => {
   return isFinite(candidate) ? candidate : fallback;
 };
 
+
+
 /*************************************
  *                STORE
  ************************************* */
 
 export const useMindMapStore = create<MindMapStore>((set, get) => {
-  const preferences = loadPreferences();
+  const preferences = SettingsService.load();
 
   // Helper to add current map to history
   const addToHistory = (newMap: MindMap) => {
@@ -152,11 +157,16 @@ export const useMindMapStore = create<MindMapStore>((set, get) => {
     historyIndex: -1,
     currentFilePath: null,
     isDirty: false,
+    favoriteColors:preferences.favoriteColors ?? [],
+    edgeStyle: preferences.edgeStyle || 'curved',
+    language: resolveLocale(preferences.language),
 
     // Initial search
     search: {
       query: '',
       results: [],
+      activeResultIndex: 0,
+      caseSensitive: false,
       isSearching: false,
       isActive: false,
       lastUpdatedAt: null,
@@ -177,6 +187,8 @@ export const useMindMapStore = create<MindMapStore>((set, get) => {
         search: {
           query: '',
           results: [],
+          activeResultIndex: 0,
+          caseSensitive: false,
           isSearching: false,
           isActive: false,
           lastUpdatedAt: null,
@@ -197,6 +209,8 @@ export const useMindMapStore = create<MindMapStore>((set, get) => {
         search: {
           query: '',
           results: [],
+          activeResultIndex: 0,
+          caseSensitive: false,
           isSearching: false,
           isActive: false,
           lastUpdatedAt: null,
@@ -217,6 +231,8 @@ export const useMindMapStore = create<MindMapStore>((set, get) => {
         search: {
           query: '',
           results: [],
+          activeResultIndex: 0,
+          caseSensitive: false,
           isSearching: false,
           isActive: false,
           lastUpdatedAt: null,
@@ -231,7 +247,7 @@ export const useMindMapStore = create<MindMapStore>((set, get) => {
       
       const newNode: MindMapNode = {
         id: generateId(),
-        text: text || 'New Node',
+        text: text || i18n.t('canvas.newNode'),
         parentId: null,
         children: [],
         style: { ...DEFAULT_NODE_STYLE },
@@ -389,6 +405,7 @@ export const useMindMapStore = create<MindMapStore>((set, get) => {
         });
     },
 
+
     /****************************************
      *         SELECTION & EDITING
      **************************************** */
@@ -397,6 +414,7 @@ export const useMindMapStore = create<MindMapStore>((set, get) => {
     
     setEditingNode: (nodeId: string | null) => set({ editingNodeId: nodeId }),
     
+
     /***************************************
      *             VIEWPORT
     **************************************** */
@@ -467,6 +485,7 @@ export const useMindMapStore = create<MindMapStore>((set, get) => {
         console.error('Error in focusOnNode:', error);
       }
     },
+
     
     /*******************************************
      *           UI PREFERENCES
@@ -474,13 +493,14 @@ export const useMindMapStore = create<MindMapStore>((set, get) => {
 
     setLayout: (layout: LayoutType) => {
       set({ layout });
-      savePreferences({ layout });
+      SettingsService.save({ layout });
     },
 
     setTheme: (theme: 'light' | 'dark') => {
       set({ theme });
-      savePreferences({ theme });
+      SettingsService.save({ theme });
     },
+
 
     /**********************************************
      *                    HISTORY
@@ -523,16 +543,83 @@ export const useMindMapStore = create<MindMapStore>((set, get) => {
       return historyIndex < history.length - 1;
     },
 
+
     /*******************************************
      *               UTILITY
      ******************************************* */
     
     setCurrentFilePath: (path) => set({ currentFilePath: path }),
     setIsDirty: (isDirty) => set({ isDirty }),
+
+
+
+    setEdgeStyle: (edgeStyle: EdgeStyle) => {
+      set({ edgeStyle });
+      SettingsService.save({ edgeStyle });
+    },
+
+    updateAllNodesStyle: (style: Partial<NodeStyle>) => {
+      const { currentMap } = get();
+      if (!currentMap) return;
+
+      const newMap = deepClone(currentMap);
+      Object.values(newMap.nodes).forEach((node) => {
+        node.style = { ...node.style, ...style };
+      });
+      newMap.updatedAt = Date.now();
+
+      addToHistory(newMap);
+    },
+
+    setLanguage: (lang: SupportedLocale) => {
+      set({ language: lang });
+      SettingsService.save({ language: lang });
+      i18n.changeLanguage(lang);
+      applyDirection(lang);
+    },
     
+
+    /********************************************
+     *            FAVORITE COLORS 
+     ******************************************** */ 
+
+    addFavoriteColor: (color: string, userId?: string) => {
+      const normalized = normalizeHex(color);
+      const { favoriteColors } = get();
+
+      // Ignore duplicates
+      const isDuplicate = favoriteColors.some((f) => f.color === normalized && f.userId === userId);
+      if (isDuplicate) return;
+
+      const newEntry: FavoriteColor = {
+        color: normalized,
+        addedAt: Date.now(),
+        ...(userId !== undefined && { userId }),
+      };
+
+      const trimmed = favoriteColors.length >= MAX_FAVORITE_COLORS ? favoriteColors.slice(1) : favoriteColors;
+
+      const updated = [...trimmed, newEntry];
+      set({ favoriteColors:updated });
+      SettingsService.save({ favoriteColors: updated });
+    },
+
+    removeFavoriteColor: (color: string, userId?: string) => {
+      const normalized = normalizeHex(color);
+      const { favoriteColors } = get();
+
+      const updated = favoriteColors.filter(
+        (f) => !(f.color === normalized && f.userId === userId)
+      );
+
+      set({ favoriteColors: updated });
+      SettingsService.save({ favoriteColors: updated });
+    },
+
+
     /********************************************
      *             FILE OPETATIONS 
-     ******************************************** */ 
+     ******************************************** */
 
     saveMap: async () => {
       const { currentMap, currentFilePath } = get();
@@ -740,6 +827,7 @@ export const useMindMapStore = create<MindMapStore>((set, get) => {
         search: {
           ...state.search,
           query: trimmed,
+          activeResultIndex: 0,
           isActive: trimmed.length >= DEFAULT_SEARCH_CONFIG.MinQueryLength,
           lastUpdatedAt: now,
         },
@@ -751,6 +839,8 @@ export const useMindMapStore = create<MindMapStore>((set, get) => {
         search: {
           query: '',
           results: [],
+          activeResultIndex: 0,
+          caseSensitive: false,
           isSearching: false,
           isActive: false,
           lastUpdatedAt: null,
@@ -766,6 +856,7 @@ export const useMindMapStore = create<MindMapStore>((set, get) => {
           search: {
             ...state.search,
             results: [],
+            activeResultIndex: 0,
             isSearching: false,
           },
         }));
@@ -779,15 +870,36 @@ export const useMindMapStore = create<MindMapStore>((set, get) => {
         },
       }));
 
-      const results = runFuzzySearch(_searchIndex, query);
+      const results = runFuzzySearch(_searchIndex, query, search.caseSensitive);
 
       set((state) => ({
         search: {
           ...state.search,
           results,
+          activeResultIndex: 0,
           isSearching: false,
         },
       }));
     },
+
+    toggleCaseSensitive: () => {
+      set((state) => ({
+        search: {
+          ...state.search,
+          caseSensitive: !state.search.caseSensitive,
+          activeResultIndex: 0,
+        }
+      }));
+      get().runSearchNow();
+    },
+
+    setActiveResultIndex: (index: number) => {
+      set((state) => ({
+        search: {
+          ...state.search,
+          activeResultIndex: index,
+        }
+      }))
+    }
   };
 });

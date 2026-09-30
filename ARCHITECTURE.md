@@ -13,23 +13,30 @@ This document provides a comprehensive overview of MindMapper's technical archit
 5. [Data Flow](#data-flow)
 6. [Security Model](#security-model)
 7. [State Management](#state-management)
-8. [Layout Engine](#layout-engine)
-9. [IPC Communication](#ipc-communication)
-10. [Build System](#build-system)
+8. [Internationalization](#internationalization)
+9. [Layout Engine](#layout-engine)
+10. [IPC Communication](#ipc-communication)
+11. [Build System](#build-system)
 
 ---
 
 ## Overview
 
-MindMapper is built as an Electron desktop application with a React-based user interface. The architecture follows modern best practices for security, performance, and maintainability.
+MindMapper is a privacy-first, local-first desktop application for creating and managing mind maps.
+
+The application is built on Electron using a strict separation between the Main Process, Preload layer and Renderer process. All user data remains on the local machine and no cloud services are required for normal operation.
+
+The rendering system has been designed around modularity, allowing multiple visualization engines while sharing the same rendering pipeline.
 
 ### Key Principles
 
-- **Separation of Concerns**: Clear boundaries between main process, renderer, and preload
-- **Type Safety**: Full TypeScript coverage for compile-time error detection
-- **Security First**: Context isolation, sandboxing, and minimal privileges
-- **Performance**: Efficient rendering and state updates
-- **Extensibility**: Modular design for future enhancements
+- Local-first architecture
+- Privacy-first by design
+- Strong TypeScript typing
+- Modular rendering pipeline
+- Clear separation of concerns
+- Extensible visualization engines
+- Security through Electron best practices
 
 ---
 
@@ -38,7 +45,7 @@ MindMapper is built as an Electron desktop application with a React-based user i
 ### Core Technologies
 
 | Technology | Version | Purpose |
-|-----------|---------|---------|
+|----|----|----|
 | Electron | 27.x | Desktop application framework |
 | React | 18.x | UI library |
 | TypeScript | 5.x | Type-safe JavaScript |
@@ -48,10 +55,13 @@ MindMapper is built as an Electron desktop application with a React-based user i
 ### Key Libraries
 
 | Library | Purpose |
-|---------|---------|
+|----|----|
 | dagre | Graph layout algorithm |
 | lucide-react | Icon set |
 | electron-builder | Application packaging |
+| i18next | Core internationalization framework |
+| react-i18next | React integration for i18next |
+| i18next-http-backend | Lazy loading of translation JSON resources |
 
 ---
 
@@ -61,26 +71,49 @@ MindMapper is built as an Electron desktop application with a React-based user i
 mindmapper/
 ├── src/
 │   ├── main/                 # Main process (Node.js/Electron)
-│   │   └── main.ts           # Entry point, window management, IPC handlers
+│   │   └── main.ts           # Entry point, window management, IPC handlers, native menu
 │   │
 │   ├── preload/              # Preload scripts (bridge between main and renderer)
 │   │   └── preload.ts        # IPC API exposure
 │   │
+│   ├── shared/               # Shared types/contracts used by main and renderer
+│   │   └── types/
+│   │       └── menu.ts       # Native menu label IPC contract
+│   │
 │   └── renderer/             # Renderer process (React/TypeScript)
-│       ├── main.tsx          # React entry point
+│       ├── main.tsx          # React entry point, initializes i18n
 │       ├── App.tsx           # Root component
 │       ├── index.html        # main HTML
 │       │
-│       ├── components/       # React components
-│       │   ├── Canvas.tsx    # SVG canvas for mind map
-│       │   ├── Toolbar.tsx   # Top toolbar
-│       │   ├── NodeEditor.tsx # Right sidebar editor
-│       │   └── SearchBar.tsx # Search bar component
+│       ├── components/             # React components
+│       │   ├── BorderPopover.tsx   # Border selector pop-up window
+│       │   ├── ColorPopover.tsx    # Color selector pop-up window
+│       │   ├── IconPopover.tsx     # Icon selector pop-up window
+│       │   ├── NodeEditor.tsx      # Right sidebar editor
+│       │   ├── SearchBar.tsx       # Search bar component
+│       │   ├── SettingsModal.tsx   # Language and appearance settings
+│       │   ├── Toolbar.tsx         # Top toolbar
+│       │   └── canvas/                  # SVG canvas for mind map
+│       │       ├── CanvasNode.tsx
+│       │       ├── CanvasEdges.tsx
+│       │       ├── CanvasViewport.tsx
+│       │       ├── Canvas.tsx              # Clean orchestrator
+│       │       ├── index.ts                # Unified re-exports
+│       │       └── layouts/
+│       │           ├── HierarchicalView.tsx
+│       │           └── RadialView.tsx
 │       │
-│       ├── hooks             # hooks porcess
-│       │   └── useFuzzySearch.ts # Searching hooks
+│       ├── hooks                   # React custom hooks
+│       │   └── useFuzzySearch.ts   # Searching hooks
 │       │
-│       ├── store/            # State management
+│       ├── i18n/                  # Internationalization setup
+│       │   └── i18n.ts            # Locale resolution, i18next init, RTL support
+│       │
+│       ├── services/              # Renderer services
+│       │   ├── menuSyncService.ts # Native menu label synchronization
+│       │   └── settingsService.ts # LocalStorage-backed preference persistence
+│       │
+│       ├── store/              # State management
 │       │   └── mindMapStore.ts # Zustand store
 │       │
 │       ├── types/            # TypeScript type definitions
@@ -89,29 +122,57 @@ mindmapper/
 │       │   └── search.ts     # Searching types
 │       │
 │       ├── utils/            # Utility functions
-│       │   ├── layout.ts     # Graph layout logic
-│       │   ├── theme.ts      # Theme management
+│       │   ├── colorUtils.ts # Changes in colors
 │       │   ├── exporters.ts  # Export functionality
 │       │   ├── importers.ts  # Import functionality
-│       │   └── searcher.ts   # Searching logic
+│       │   ├── index.ts      # Index tree node
+│       │   ├── theme.ts      # Theme management
+│       │   ├── searcher.ts   # Searching logic
+│       │   ├── edges/                    # Edge logic
+│       │   │   ├── edgeInersection.ts      # Unified re-exports
+│       │   │   ├── edgePath.ts             # Calculate curved path
+│       │   │   └── index.ts                # Unified re-exports
+│       │   └── layout/              # Graph layout logic
+│       │       ├── hierarchical.ts  # Hierarchical layout
+│       │       ├── index.ts         # Unified re-exports
+│       │       ├── radial.ts        # Radial layout
+│       │       └── shared.ts        # Types + constants + measureNodeDimensions
 │       │
-│       ├── templates/        # Mind map templates
+│       ├── templates/              # Mind map templates
 │       │   └── brainstorming.ts
 │       │
-│       └── styles/           # CSS stylesheets
-│           ├── index.css     # Global styles
-│           ├── App.css       # App layout
-│           ├── Canvas.css    # Canvas styles
-│           ├── Toolbar.css   # Toolbar styles
-│           ├── NodeEditor.css # Editor styles
-│           ├── edges.css     # Edges styles
-│           └── SearchBar.css # Search bar styles
+│       └── styles/                 # CSS stylesheets
+│           ├── App.css             # App layout
+│           ├── Canvas.css          # Canvas styles
+│           ├── ColorPopover.css    # Color and border popover styles
+│           ├── edges.css           # Edges styles
+│           ├── IconPopover.css     # Icon popover styles
+│           ├── index.css           # Global styles
+│           ├── NodeEditor.css      # Editor styles
+│           ├── SearchBar.css       # Search bar styles
+│           ├── SettingsModal.css   # Settings modal styles
+│           └── Toolbar.css         # Toolbar styles
 │
-├── dist/                     # Compiled output
+├── dist/                    # Compiled output
 ├── release/                  # Packaged applications
+├── locales/                  # Translation resources
+│   ├── es/
+│   │   └── translation.json  # Spanish translations
+│   └── en/
+│       └── translation.json  # English translations
+│
+├── docs/
+│   └── issues/               # Issues documentation
+│       ├── ADR-001-issue-6-dynamic-node-sizing.md 
+│       ├── ADR-002-issue-5-node-background-personalization.md
+│       ├── ADR-003-issue-12-advance-color-management.md
+│       ├── ADR-004-issue-3-radial-view-refactor.md
+│       ├── ADR-005-issue-1-all-text-underlined-search.md
+│       ├── ADR-006-issue-123-node-icon-options.md
+│       └── ADR-007-issue-21-internationalization.md
 ├── package.json              # Dependencies and scripts
 ├── tsconfig.json             # TypeScript configuration
-├── vite.config.ts            # Vite configuration
+├── vite.config.ts            # Vite configuration (serves locale resources)
 └── electron-builder.yml      # Packaging configuration
 ```
 
@@ -121,79 +182,130 @@ mindmapper/
 
 ### 1. Main Process Layer
 
-**Location**: `src/main/main.ts`
+**Location**: `src/main/`
 
 **Responsibilities**:
-- Window lifecycle management
-- Application menu creation
-- File system operations
-- IPC handlers for secure file access
-- Native OS integration
+- Application lifecycle
+- Native window management
+- File operations
+- IPC handlers
+- Native menus (localized through renderer-provided labels)
+- SQLite access
+- Export operations
 
-**Key Components**:
-- `createWindow()`: Creates and configures the main window
-- `createApplicationMenu()`: Builds the native menu
-- IPC Handlers: `file:saveDialog`, `file:openDialog`, `file:exportPDF`, etc.
-
-**Security Measures**:
-- Runs with full Node.js privileges
-- Validates all IPC inputs
-- Restricts file system access to user-selected paths
+The Main Process is the only layer allowed to access privileged Node.js APIs directly.
 
 ### 2. Preload Layer
 
-**Location**: `src/preload/preload.ts`
+**Location**: `src/preload/`
 
 **Responsibilities**:
-- Bridge between main and renderer processes
-- Exposes safe IPC APIs to renderer
-- Type-safe API definitions
+- Secure bridge between Electron and React
+- IPC exposure
+- Type-safe APIs
+- Renderer isolation
 
-**Key APIs**:
-```typescript
-window.electronAPI = {
-  file: { save, saveDialog, load, openDialog, exportPDF, exportJSON },
-  dialog: { showMessage },
-  app: { getPath },
-  menu: { onNew, onOpen, onSave, ... },
-  window: { onBeforeClose, allowClose }
-}
-```
-
-**Security Measures**:
-- Context isolation enabled
-- Only whitelisted APIs exposed
-- No direct Node.js access from renderer
+Only explicitly exposed APIs are accessible from the renderer.
 
 ### 3. Renderer Layer
 
 **Location**: `src/renderer/`
 
 **Responsibilities**:
-- User interface rendering
-- User interaction handling
-- State management
-- Visual layout computation
-
-**Key Components**:
-- **App.tsx**: Root component, keyboard shortcuts, menu handlers
-- **Canvas.tsx**: SVG rendering, zoom/pan, node visualization
-- **Toolbar.tsx**: Action buttons, file operations, theme toggle
-- **NodeEditor.tsx**: Node property editing sidebar
-- **Node.tsx**: Individual node rendering and interaction
+- React UI
+- Canvas rendering
+- User interaction
+- State synchronization
+- Layout computation
+- SVG generation
+- Translation resource loading and i18n state
 
 **Security Measures**:
 - Runs in sandboxed environment
 - No direct access to Node.js APIs
 - All privileged operations go through IPC
 
+### 4. Canvas Rendering Architecture
+
+The canvas follows a modular architecture introduced during Issue #3.
+
+```text
+Canvas.tsx
+                    │
+        ┌────┴────┐
+        │                    │
+CanvasNodes.tsx              CanvasEdges.tsx
+        │                    │
+        └────┬────┘
+                    │
+               LayoutResult
+                    │
+          ┌────┴────┐
+          │                    │
+ Hierarchical Layout       Radial Layout
+```
+
+Responsibilities are clearly separated:
+
+**Canvas**
+Coordinates rendering.
+
+**CanvasNodes**
+Draws every node.
+
+Responsibilities:
+- Background
+- Borders
+- Icons
+- Text
+- Editing
+- Root highlighting
+- Collapse controls
+
+**CanvasEdges**
+Draws every connection.
+
+Responsibilities:
+- Straight edges
+- Curved edges
+- Arrowheads
+- Border intersection
+
+**Layout Engines**
+Responsible only for computing node positions.
+No SVG geometry is generated inside layout algorithms.
+
 ---
 
 ## Data Flow
 
+The application follows a unidirectional rendering pipeline.
+
+```text
+Mind Map Data
+       │
+       ▼
+Layout Engine
+(Hierarchical / Radial)
+       │
+       ▼
+LayoutResult
+       │
+       ├────┐
+       ▼               ▼
+CanvasNodes      CanvasEdges
+       │               │
+       └────┬────┘
+               ▼
+             SVG
+               │
+               ▼
+            Renderer
+```
+
 ### User Action Flow
 
-```
+```text
 User Action
     ↓
 UI Component (React)
@@ -209,7 +321,7 @@ Component Re-render
 
 ### File Operation Flow
 
-```
+```text
 User Action (e.g., Save)
     ↓
 Store Action (saveMap)
@@ -233,7 +345,7 @@ Show Success Message
 
 ### Layout Computation Flow
 
-```
+```text
 Mind Map Data (nodes, edges)
     ↓
 buildGraphLayout() [utils/layout.ts]
@@ -285,6 +397,7 @@ While not explicitly set, the architecture naturally follows CSP principles by i
 - File paths are sanitized
 - User confirmation required for destructive actions
 - No eval() or dynamic code execution
+- Native-menu labels are sent from renderer to main, never executed as code
 
 ---
 
@@ -292,72 +405,167 @@ While not explicitly set, the architecture naturally follows CSP principles by i
 
 ### Zustand Store
 
+MindMapper uses Zustand as its global state container.
+
 **Location**: `src/renderer/store/mindMapStore.ts`
 
-**State Structure**:
-```typescript
-{
-  currentMap: MindMap | null,
-  selectedNodeId: string | null,
-  editingNodeId: string | null,
-  viewport: ViewportState,
-  history: MindMap[],
-  historyIndex: number,
-  currentFilePath: string | null,
-  isDirty: boolean
-}
-```
+**Responsibilities**:
+- Current map
+- Selected node
+- Editing state
+- View mode
+- Viewport
+- Undo / Redo history
+- Current file
+- Dirty state
+- Current language
+- Global style operations (batch updates across nodes)
 
-**Key Actions**:
-- `createNewMap`: Initialize a new mind map
-- `loadMap`: Load an existing mind map
-- `createNode`: Add a new node
-- `deleteNode`: Remove a node and its children
-- `updateNodeText`: Edit node text
-- `updateNodeStyle`: Change node appearance
-- `undo/redo`: History navigation
-- `saveMap`: Persist to disk
-- `openMap`: Load from disk
-- `exportPDF/JSON`: Export operations
+Application state is immutable from the UI perspective and updated exclusively through store actions.
 
-**History Management**:
-- Immutable state updates
-- Deep copy on each modification
-- Linear history (no branching)
-- Undo/redo with index pointer
+The store represents the single source of truth for the renderer.
+
+Besides node-specific updates, the store also exposes batch style actions (e.g. updateAllNodesStyle) to perform global visual operations while preserving a single Undo/Redo history entry.
+
+---
+
+## Internationalization
+
+MindMapper supports multiple languages through a local-first internationalization stack. The initial supported languages are Spanish (`es`) and English (`en`), with Spanish as the fallback locale.
+
+### Design Principles
+
+- All translation resources are stored locally in the application bundle.
+- Language selection works offline.
+- No user content or application text is sent to a translation service.
+- The renderer owns i18next state; the main process only rebuilds the native menu from a renderer-supplied label payload.
+- Locale preferences are persisted on the local machine via `SettingsService`.
+
+### Locale Resolution
+
+The initial locale is resolved in the following order:
+
+1. A persisted value from `SettingsService` if it is a supported locale.
+2. The operating-system locale returned by the main process through `app:getLocale`, mapped to a supported locale.
+3. Spanish (`es`) as the deterministic fallback.
+
+Once resolved, the locale is persisted locally and reused on subsequent launches.
+
+### Translation Resources
+
+Translation files are located at `locales/{lng}/translation.json` and are loaded lazily by `i18next-http-backend`. Vite serves them during development and bundles them in production so they are available at the same relative path.
+
+Resources cover:
+
+- Common actions and dialog buttons.
+- Toolbar controls, tooltips and labels.
+- Canvas defaults and node editing UI.
+- Search bar UI.
+- Settings modal UI.
+- Native Electron menu labels and About-dialog text.
+
+### Renderer i18n Initialization
+
+`src/renderer/i18n/i18n.ts` centralizes:
+
+- Supported locale definitions and locale resolution.
+- i18next initialization.
+- Lazy resource loading.
+- Document language and direction updates (`document.documentElement.lang` and `document.documentElement.dir`).
+- Native menu label synchronization after initialization and on every `languageChanged` event.
+
+### Local Preference Persistence
+
+`src/renderer/services/settingsService.ts` stores user preferences such as the selected language and theme in `localStorage`. The store reads and writes the language preference through this service.
+
+When the user changes the language:
+
+1. The Zustand store updates its `language` state.
+2. `SettingsService` persists the value.
+3. `i18n.changeLanguage()` is invoked.
+4. The document direction is updated.
+5. `i18next` emits `languageChanged`, which triggers native menu resynchronization.
+
+### Native Menu Synchronization
+
+Because the main process does not share the renderer's i18next state, the renderer resolves the labels needed by the native menu and sends them through IPC.
+
+`src/renderer/services/menuSyncService.ts` builds a `MenuLabels` payload from the current i18next translation and calls `window.electronAPI.menu.setLabels(labels)`. It is invoked on startup and after each language change.
+
+`src/shared/types/menu.ts` defines the exact `MenuLabels` contract shared by main, preload and renderer code.
+
+The main process uses the received labels to rebuild the native Electron menu. Menu commands are broadcast back to the renderer as `menu:*` events, and the renderer registers handlers through the preload bridge to execute the corresponding store or UI actions.
+
+### RTL Support
+
+The document direction is set based on the active locale. A maintained list of RTL languages is checked during initialization and language changes. Current supported locales are left-to-right, but the mechanism is in place for future RTL languages without changing the architecture.
+
+### Adding a New Language
+
+1. Create a new `locales/{lng}/translation.json` file.
+2. Add the locale to the supported-locale list in `src/renderer/i18n/i18n.ts`.
+3. Add a localized label to the settings modal if the language is exposed to users.
+4. Verify all translation keys are present in the new resource.
+5. Verify the native menu rebuilds correctly when the new language is selected.
 
 ---
 
 ## Layout Engine
 
-### Algorithm: Dagre
+MindMapper currently provides two layout engines.
 
-MindMapper uses the Dagre graph layout algorithm for automatic node positioning.
+### Hierarchical Layout
 
-**Location**: `src/renderer/utils/layout.ts`
+**Implementation**: `utils/layout/hierarchical.ts`
 
-**Process**:
-1. Create a directed graph
-2. Add nodes with dimensions (width, height)
-3. Add edges (parent-child relationships)
-4. Configure layout options (direction, spacing, etc.)
-5. Run the layout algorithm
-6. Extract computed positions
+**Characteristics**:
+- Dagre-based
+- Left-to-right organization
+- Dynamic node sizing
+- Automatic spacing
 
-**Configuration**:
-```typescript
-{
-  rankdir: 'LR',        // Left-to-right layout
-  nodesep: 50,          // Space between nodes in same rank
-  edgesep: 10,          // Space between edges
-  ranksep: 80,          // Space between ranks
-}
+Best suited for structured diagrams.
+
+### Radial Layout
+
+**Implementation**: `utils/layout/radial.ts`
+
+**Characteristics**:
+- Custom implementation
+- Variable node sizes
+- Dynamic radius calculation
+- Angular sector distribution
+- Collision reduction
+- Subtree balancing
+
+Best suited for brainstorming and concept exploration.
+
+### Shared Layout Utilities
+
+`utils/layout/shared.ts`
+
+Provides:
+- Shared constants
+- Node dimension calculation
+- Common geometry
+- Shared layout types
+
+### Edge Rendering
+
+Rendering is independent from layout.
+
+```text
+utils/edges/
+├── edgeIntersection.ts
+└── edgePath.ts
 ```
 
-**Optimizations**:
-- Layout computed only when structure changes
-- Cached dimensions to avoid recalculation
-- Efficient update mechanism
+Responsibilities:
+- Border intersection
+- Bézier generation
+- Straight path generation
+
+This allows new edge styles without modifying layout algorithms.
 
 ---
 
@@ -451,29 +659,6 @@ All IPC handlers follow a consistent error pattern:
 
 ---
 
-## Performance Considerations
-
-### Rendering Optimization
-
-1. **React Memoization**: Use `React.memo()` for expensive components
-2. **Selective Re-renders**: Only update changed nodes
-3. **Virtual DOM**: React's efficient diffing algorithm
-4. **CSS Transitions**: Smooth animations with GPU acceleration
-
-### State Updates
-
-1. **Immutable Updates**: Prevent unnecessary re-renders
-2. **Batched Updates**: React automatically batches state changes
-3. **Shallow Equality**: Zustand uses shallow comparison
-
-### Layout Computation
-
-1. **On-Demand**: Only compute when structure changes
-2. **Cached Dimensions**: Store node dimensions
-3. **Incremental Updates**: Future optimization opportunity
-
----
-
 ## Error Handling
 
 ### Error Boundaries
@@ -503,72 +688,6 @@ if (!result.success) {
 - Error dialogs for failures
 - Confirmation dialogs for destructive actions
 - Loading states for async operations
-
----
-
-## Testing Strategy
-
-### Current State
-
-Phase 1 focuses on implementation. Testing will be added in Phase 2.
-
-### Planned Testing
-
-1. **Unit Tests**: Jest + Testing Library for components and utilities
-2. **Integration Tests**: Test IPC communication flow
-3. **E2E Tests**: Playwright for full application testing
-4. **Type Tests**: TypeScript for compile-time verification
-
----
-
-## Future Architecture Improvements
-
-### Phase 2
-
-1. **Modular Plugin System**: Allow extensions
-2. **Service Workers**: Background tasks and caching
-3. **Web Workers**: Offload heavy computations
-4. **IndexedDB**: Local storage for large data
-
-### Phase 3
-
-1. **Multi-Window Support**: Multiple mind maps open simultaneously
-2. **Real-Time Sync**: Collaborative editing with WebSockets
-3. **Cloud Storage**: Direct integration with cloud providers
-4. **Mobile Apps**: React Native for iOS/Android
-
----
-
-## Development Guidelines
-
-### Code Style
-
-- Use TypeScript strict mode
-- Follow functional programming patterns
-- Prefer immutability
-- Use descriptive variable names
-- Add JSDoc comments for complex functions
-
-### Component Design
-
-- Keep components small and focused
-- Use composition over inheritance
-- Separate logic from presentation
-- Extract reusable utilities
-
-### State Management
-
-- Keep state minimal and normalized
-- Avoid derived state (compute on the fly)
-- Use selectors for complex queries
-- Document state shape with TypeScript
-
-### File Organization
-
-- Group by feature, not by type
-- Keep related files together
-- Use index files for clean imports
-- Maintain consistent naming conventions
 
 ---
 

@@ -5,6 +5,8 @@
  ************************************** */
 
 export type NodeStatus = 'pending' | 'in-progress' | 'done';
+export type BackgroundType = 'solid' | 'none';
+export type BorderStyle = 'none' | 'bottom' | 'full';
 
 export interface NodeStyle {
   backgroundColor: string;
@@ -15,9 +17,14 @@ export interface NodeStyle {
   fontSize?: number;
   fontWeight?: 'normal' | 'bold';
   padding?: number;
-  icon?: string; // Emoji or Lucide icon name
+  icon?: string;
   status?: NodeStatus;
+  backgroundOpacity: number; // 0-100
+  backgroundType: BackgroundType;
+  borderStyle: BorderStyle;
 }
+
+
 
 /**************************************
  *       GEOMETRY & POSITION
@@ -35,6 +42,8 @@ export interface Connection {
   fromPos: Position;
   toPos: Position;
 }
+
+
 
 /**************************************
  *        MIND MAP CORE MODEL
@@ -60,6 +69,8 @@ export interface MindMap {
   updatedAt: number;
 }
 
+
+
 /**************************************
  *              ACTIONS
  ************************************** */
@@ -73,6 +84,8 @@ export type NodeAction =
   | { type: 'TOGGLE_COLLAPSE'; payload: { nodeId: string } }
   | { type: 'SELECT_NODE'; payload: { nodeId: string | null } };
 
+
+
 /**************************************
  *          VIEWPORT STATE
  ************************************** */
@@ -84,26 +97,61 @@ export interface ViewportState {
 }
 
 /**************************************
- *           DEFAULT STYLE
+ *           COLOR PALETTE
  ************************************** */
 
-export const DEFAULT_COLORS = [
-  '#60A5FA', // blue
-  '#34D399', // green
-  '#FBBF24', // yellow
-  '#F87171', // red
-  '#A78BFA', // purple
-  '#FB923C', // orange
-  '#EC4899', // pink
-  '#14B8A6', // teal
-];
+export const STANDARD_PALETTE: readonly string[][] = [
+  // Row 0 — Neutrals
+  ['#FFFFFF', '#F3F4F6', '#D1D5DB', '#9CA3AF', '#6B7280', '#374151', '#1F2937', '#111827'],
+  // Row 1 — Blues & Teals
+  ['#DBEAFE', '#93C5FD', '#60A5FA', '#3B82F6', '#2563EB', '#1D4ED8', '#14B8A6', '#0D9488'],
+  // Row 2 — Greens & Limes
+  ['#D1FAE5', '#6EE7B7', '#34D399', '#10B981', '#059669', '#047857', '#84CC16', '#65A30D'],
+  // Row 3 — Reds, Oranges & Yellows
+  ['#FEE2E2', '#FCA5A5', '#F87171', '#EF4444', '#DC2626', '#FBBF24', '#F59E0B', '#FB923C'],
+  // Row 4 — Purples & Pinks
+  ['#EDE9FE', '#C4B5FD', '#A78BFA', '#8B5CF6', '#7C3AED', '#EC4899', '#DB2777', '#BE185D'],
+] as const;
+
+export const ALL_STANDARD_COLORS:readonly string[] = STANDARD_PALETTE.flat();
+
+export const DEFAULT_COLORS= STANDARD_PALETTE[1];   // Blues row
+
+
+
+/**************************************
+ *       USER COLOR PREFERENCES
+ ************************************** */
+
+export interface FavoriteColor {
+  color: string;      // Hex string
+  addedAt: number;    // Unix timestampt (ms)
+  userId?: string;     // Per-user scoping - Future
+}
+
+export interface UserColorPreferences{
+  favoriteColors: FavoriteColor[];
+}
+
+export const MAX_FAVORITE_COLORS = 10;
+
+
+
+/**************************************
+ *           DEFAULT STYLE
+ ************************************** */
 
 export const DEFAULT_NODE_STYLE: NodeStyle = {
   backgroundColor: '#60A5FA',
   textColor: '#FFFFFF',
-  icon: 'Circle',
+  icon: undefined,
   status: 'pending',
+  backgroundOpacity: 100,
+  backgroundType: 'solid',
+  borderStyle: 'full',
 };
+
+
 
 /**************************************
  *           LAYOUT TYPES

@@ -1,5 +1,8 @@
 // Type definitions for Electron IPC API
 // This file declares the global window.electronAPI interface
+import type { MenuLabels } from "../../shared/types/menu";
+
+
 
 export interface FileOperationResult {
   success: boolean;
@@ -49,6 +52,7 @@ export interface ElectronAPI {
   };
   app: {
     getPath: (name: 'home' | 'documents' | 'downloads' | 'userData') => Promise<AppPathResult>;
+    getLocale: () => Promise<string>;
   };
   menu: {
     onNew: (callback: () => void) => void;
@@ -65,6 +69,7 @@ export interface ElectronAPI {
     onFitToScreen: (callback: () => void) => void;
     onToggleTheme: (callback: () => void) => void;
     onShowShortcuts: (callback: () => void) => void;
+    setLabels: (labels: MenuLabels) => Promise<void>;
   };
   window: {
     onBeforeClose: (callback: () => void) => void;
