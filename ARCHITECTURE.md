@@ -1,6 +1,6 @@
-# MindMapper Architecture
+# MMemora Architecture
 
-This document provides a comprehensive overview of MindMapper's technical architecture, design decisions, and implementation details.
+This document provides a comprehensive overview of MMemora's technical architecture, design decisions, and implementation details.
 
 ---
 
@@ -22,7 +22,7 @@ This document provides a comprehensive overview of MindMapper's technical archit
 
 ## Overview
 
-MindMapper is a privacy-first, local-first desktop application for creating and managing mind maps.
+MMemora is a privacy-first, local-first desktop application for creating and managing mind maps.
 
 The application is built on Electron using a strict separation between the Main Process, Preload layer and Renderer process. All user data remains on the local machine and no cloud services are required for normal operation.
 
@@ -68,7 +68,7 @@ The rendering system has been designed around modularity, allowing multiple visu
 ## Project Structure
 
 ```
-mindmapper/
+MMemora/
 ├── src/
 │   ├── main/                 # Main process (Node.js/Electron)
 │   │   └── main.ts           # Entry point, window management, IPC handlers, native menu
@@ -190,7 +190,7 @@ mindmapper/
 - File operations
 - IPC handlers
 - Native menus (localized through renderer-provided labels)
-- SQLite access
+- Local file persistence (.mindmap.json via native dialogs)
 - Export operations
 
 The Main Process is the only layer allowed to access privileged Node.js APIs directly.
@@ -398,6 +398,23 @@ While not explicitly set, the architecture naturally follows CSP principles by i
 - User confirmation required for destructive actions
 - No eval() or dynamic code execution
 - Native-menu labels are sent from renderer to main, never executed as code
+
+---
+
+## Data Migration Strategy
+
+### Rebranding: MindMapper → MMemora (v0.4.0)
+
+Electron derives `userData` location from the application identity. To avoid silent data loss during the MindMapper → MMemora rename, the Main Process explicitly pins the `userData` path via `app.setPath('userData', ...)` before `app.whenReady()`, and performs a one-time, idempotent, non-destructive migration of any pre-existing legacy directory.
+
+**Implementation**: `src/main/migration/userDataMigration.ts`
+
+**Guarantees**:
+- Idempotent via a `.migrated` marker file.
+- Non-destructive: the legacy `MindMapper` directory is never deleted.
+- Fail-safe: migration errors are logged but never block application boot.
+
+This mechanism is designed to be reused for any future rebranding or major identity change without requiring architectural rework.
 
 ---
 

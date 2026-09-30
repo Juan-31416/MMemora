@@ -2,6 +2,9 @@ import { app, BrowserWindow, ipcMain, dialog, Menu, shell } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import type { MenuLabels } from '../shared/types/menu';
+import { migrateLegacyUserData, resolveUserDataPaths } from './migration/userDataMigration';
+
+
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -170,7 +173,7 @@ function createApplicationMenu(labels?: any) {
       submenu: [
         {
           label: labels?.documentation ?? 'Documentation',
-          click: async () => await shell.openExternal('https://github.com/yourusername/mindmapper'),
+          click: async () => await shell.openExternal('https://github.com/Juan-31416/MindMapper'),
         },
         {
           label: labels?.shortcuts ?? 'Keyboard Shortcuts',
@@ -179,12 +182,12 @@ function createApplicationMenu(labels?: any) {
         },
         { type: 'separator' },
         {
-          label: labels?.about ?? 'About MindMapper',
+          label: labels?.about ?? 'About MMemora',
           click: () => {
             dialog.showMessageBox(mainWindow!, {
               type: 'info',
-              title: labels?.about ?? 'About MindMapper',
-              message: 'MindMapper',
+              title: labels?.about ?? 'About MMemora',
+              message: 'MMemora',
               detail: labels?.aboutDetail ?? 'A powerful mind mapping application built with Electron, React, and TypeScript.',
               buttons: [labels?.ok ?? 'OK'],
             });
@@ -216,8 +219,16 @@ function createApplicationMenu(labels?: any) {
   Menu.setApplicationMenu(menu);
 }
 
+
+
+const { currentPath } = resolveUserDataPaths();
+app.setPath('userData', currentPath);
+
+
+
 // App lifecycle: Create window when ready
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await migrateLegacyUserData();
   createWindow();
   createApplicationMenu();
 
@@ -428,11 +439,6 @@ ipcMain.handle('app:getLocale', () => {
   return app.getLocale();
 });
 
-ipcMain.handle('menu:setLabels', (event, labels: any) => {
-  createApplicationMenu(labels); 
-});
-
-// Handler to apply menu labels
 ipcMain.handle('menu:setLabels', (_event, labels: MenuLabels) => {
   createApplicationMenu(labels);
 });

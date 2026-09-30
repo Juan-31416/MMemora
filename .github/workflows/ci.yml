@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+jobs:
+  validate:
+    name: Typecheck & Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Typecheck (main)
+        run: npx tsc -p tsconfig.main.json --noEmit
+
+      - name: Typecheck (preload)
+        run: npx tsc -p tsconfig.preload.json --noEmit
+
+      - name: Typecheck (renderer)
+        run: npx tsc -p tsconfig.renderer.json --noEmit
+
+      - name: Build
+        run: npm run build

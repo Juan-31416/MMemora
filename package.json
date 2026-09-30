@@ -1,11 +1,11 @@
 {
-  "name": "mindmapper",
+  "name": "mmemora",
   "version": "0.3.0",
   "description": "A local-first mind mapping application",
   "main": "dist/main/main.js",
   "author": {
-    "name": "MindMapper Team",
-    "email": "jp.martintejeiro@qelronzal.com"
+    "name": "CardanianTech Team",
+    "email": "juan.mtejeiro@pm.me"
   },
   "license": "MIT",
   "private": true,
@@ -48,8 +48,8 @@
     "vite": "^5.0.8"
   },
   "build": {
-    "appId": "com.mindmapper.app",
-    "productName": "MindMapper",
+    "appId": "com.cardaniantech.mmemora",
+    "productName": "MMemora",
     "directories": {
       "output": "release"
     },
